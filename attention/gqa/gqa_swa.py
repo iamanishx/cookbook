@@ -1,6 +1,8 @@
-import torch
-import torch.nn as nn
 import math
+
+import torch
+from torch import nn
+
 
 class GroupedQuerySlidingWindowAttention(nn.Module):
     def __init__(self, embed_dim, num_heads, num_kv_heads, window_size):

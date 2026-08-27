@@ -1,5 +1,5 @@
 import torch
-import torch.nn as nn
+from torch import nn
 
 from llama3.attention import GroupedQueryAttention
 from llama3.feedforward import SwiGLU

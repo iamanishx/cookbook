@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 from llama3.norm import RMSNorm
 from llama3.rope import precompute_freqs_cis

@@ -1,12 +1,12 @@
-import os
-import math
-import json
 import argparse
+import json
+import math
+import os
 from pathlib import Path
 
 import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 from llama3.model import LLaMA, LLaMAConfig
