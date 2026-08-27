@@ -39,11 +39,22 @@ class GroupedQueryAttention(nn.Module):
         self.W_value = nn.Linear(dim, kv_inner_dim, bias=False)
         self.W_out = nn.Linear(inner_dim, dim, bias=False)
 
+        self.cache_k = None
+        self.cache_v = None
+
+    def reset_cache(self):
+        """Reset the key and value cache buffers."""
+        self.cache_k = None
+        self.cache_v = None
+
     def forward(
         self,
         x: torch.Tensor,
         freqs_cis: torch.Tensor,
         mask: torch.Tensor | None = None,
+        start_pos: int = 0,
+        use_cache: bool = False,
+        max_seq_len: int | None = None,
     ) -> torch.Tensor:
         bsz, seq_len, _ = x.shape
 
@@ -52,6 +63,22 @@ class GroupedQueryAttention(nn.Module):
         values = self.W_value(x).view(bsz, seq_len, self.num_kv_heads, self.head_dim)
 
         queries, keys = apply_rotary_emb(queries, keys, freqs_cis)
+
+        if use_cache:
+            if self.cache_k is None or start_pos == 0:
+                self.cache_k = keys
+                self.cache_v = values
+            else:
+                self.cache_k = torch.cat([self.cache_k, keys], dim=1)
+                self.cache_v = torch.cat([self.cache_v, values], dim=1)
+
+            # Apply sliding window slicing if cache exceeds max context length
+            if max_seq_len is not None and self.cache_k.shape[1] > max_seq_len:
+                self.cache_k = self.cache_k[:, -max_seq_len:]
+                self.cache_v = self.cache_v[:, -max_seq_len:]
+
+            keys = self.cache_k
+            values = self.cache_v
 
         queries = queries.transpose(1, 2)
         keys = keys.transpose(1, 2)
@@ -64,6 +91,10 @@ class GroupedQueryAttention(nn.Module):
         attn_scores = queries @ keys.transpose(2, 3) * scale
 
         if mask is not None:
+            
+            if attn_scores.shape[-1] != mask.shape[-1]:
+                # Slice or adapt the mask if shapes mismatch due to caching
+                mask = mask[:, :, :, :attn_scores.shape[-1]]
             attn_scores = attn_scores.masked_fill(mask == 0, float("-inf"))
 
         attn_weights = torch.softmax(attn_scores.float(), dim=-1).type_as(queries)

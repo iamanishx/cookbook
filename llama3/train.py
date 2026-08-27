@@ -14,16 +14,6 @@ from llama3.tokenizer import BPETokenizer
 
 
 class TokenDataset(Dataset):
-    """Dataset that loads tokenized text chunks.
-
-    Splits a flat list of token IDs into fixed-length chunks
-    for next-token prediction training.
-
-    Args:
-        token_ids: Flat list of all token IDs
-        seq_len: Sequence length for each chunk
-    """
-
     def __init__(self, token_ids: list[int], seq_len: int):
         self.seq_len = seq_len
         self.data = []
@@ -43,12 +33,10 @@ class TokenDataset(Dataset):
 
 
 def load_text_file(path: str) -> str:
-    """Load a plain text file."""
     return Path(path).read_text(encoding="utf-8")
 
 
 def load_jsonl_file(path: str, text_field: str = "text") -> str:
-    """Load a JSONL file and concatenate the text field."""
     texts = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f:
@@ -61,7 +49,6 @@ def load_jsonl_file(path: str, text_field: str = "text") -> str:
 
 
 def load_data(path: str, text_field: str = "text") -> str:
-    """Load data from a text or JSONL file."""
     ext = Path(path).suffix.lower()
     if ext == ".jsonl":
         return load_jsonl_file(path, text_field)
@@ -78,7 +65,6 @@ def train(
     max_grad_norm: float = 1.0,
     log_every: int = 10,
 ):
-    """Training loop with gradient clipping and optional LR scheduling."""
     model.train()
     criterion = nn.CrossEntropyLoss()
 

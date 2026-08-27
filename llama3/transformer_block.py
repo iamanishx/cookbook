@@ -41,7 +41,17 @@ class TransformerBlock(nn.Module):
         x: torch.Tensor,
         freqs_cis: torch.Tensor,
         mask: torch.Tensor | None = None,
+        start_pos: int = 0,
+        use_cache: bool = False,
+        max_seq_len: int | None = None,
     ) -> torch.Tensor:
-        h = x + self.attention(self.attention_norm(x), freqs_cis, mask)
+        h = x + self.attention(
+            self.attention_norm(x),
+            freqs_cis,
+            mask,
+            start_pos=start_pos,
+            use_cache=use_cache,
+            max_seq_len=max_seq_len,
+        )
         out = h + self.ffn(self.ffn_norm(h))
         return out

@@ -36,21 +36,6 @@ class LLaMAConfig:
 
 
 class LLaMA(nn.Module):
-    """LLaMA language model.
-
-    Architecture:
-        Token Embedding -> Transformer Blocks -> RMSNorm -> LM Head
-
-    Uses:
-        - Grouped-Query Attention (GQA)
-        - Rotary Position Embeddings (RoPE)
-        - SwiGLU activation in FeedForward
-        - Pre-Normalization with RMSNorm
-        - Causal attention mask
-
-    Args:
-        config: LLaMAConfig instance
-    """
 
     def __init__(self, config: LLaMAConfig):
         super().__init__()
@@ -76,15 +61,29 @@ class LLaMA(nn.Module):
 
         self.register_buffer(
             "freqs_cis",
-            precompute_freqs_cis(config.head_dim, config.max_seq_len, config.rope_theta),
+            precompute_freqs_cis(
+                config.head_dim, config.max_seq_len, config.rope_theta
+            ),
             persistent=False,
         )
 
-    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+    def reset_cache(self):
+        for layer in self.layers:
+            layer.attention.reset_cache()
+
+    def forward(
+        self,
+        tokens: torch.Tensor,
+        start_pos: int = 0,
+        use_cache: bool = False,
+        max_seq_len: int | None = None,
+    ) -> torch.Tensor:
         """Forward pass.
 
         Args:
             tokens: Input token IDs of shape (batch, seq_len)
+            start_pos: Starting position index in the sequence (for RoPE & cache mapping)
+            use_cache: If True, key-value states are cached and reused
 
         Returns:
             Logits of shape (batch, seq_len, vocab_size)
@@ -92,11 +91,22 @@ class LLaMA(nn.Module):
         bsz, seq_len = tokens.shape
         h = self.tok_embeddings(tokens)
 
-        mask = self._make_causal_mask(seq_len, tokens.device)
-        freqs_cis = self.freqs_cis[:seq_len]
+        if use_cache and seq_len == 1:
+            mask = None
+        else:
+            mask = self._make_causal_mask(seq_len, tokens.device)
+
+        freqs_cis = self.freqs_cis[start_pos : start_pos + seq_len]
 
         for layer in self.layers:
-            h = layer(h, freqs_cis, mask)
+            h = layer(
+                h,
+                freqs_cis,
+                mask,
+                start_pos=start_pos,
+                use_cache=use_cache,
+                max_seq_len=max_seq_len,
+            )
 
         h = self.norm(h)
         return self.output(h)
